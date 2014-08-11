@@ -1,0 +1,223 @@
+﻿@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <style id="Maps">
+        html, body, #map-canvas
+        {
+            height: 100%;
+            margin: 0px;
+            padding: 0px;
+        }
+    </style>
+
+    <script src="//ajax.googleapis.com/ajax/libs/jquery/1.11.1/jquery.min.js"></script>
+    <link rel="stylesheet" href="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.0/themes/smoothness/jquery-ui.css" />
+    <script src="//ajax.googleapis.com/ajax/libs/jqueryui/1.11.0/jquery-ui.min.js"></script>
+    <script type="text/javascript"
+        src="https://maps.googleapis.com/maps/api/js?key=@ViewBag.GKey">
+    </script>
+    <script type="text/javascript" src="http://maps.googleapis.com/maps/api/js?libraries=places"></script>
+    <meta charset="utf-8" />
+    <title>Shubkagel</title>
+</head>
+<body>
+    <div id="divHiddenProperties">
+        <table>
+            <tr>
+                <td colspan="2">
+                    <label>Current Location</label></td>
+            </tr>
+            <tr>
+                <td>
+                    <label for="txtLatitude">Latitude</label></td>
+                <td>
+                    @Html.TextBox("txtLatitude")
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <label for="txtLongitude">Longitude</label></td>
+                <td>
+                    @Html.TextBox("txtLongitude")</td>
+            </tr>
+        </table>
+    </div>
+    <div id="map-canvas" />
+
+</body>
+<script id="jsScripts" type="text/javascript">
+    var initialLocation;
+    var haymarket = new google.maps.LatLng(40.815364, -96.710031);
+    var browserSupportFlag = new Boolean();
+
+
+    var map;
+    var infowindow;
+    var infoWindows = [];
+
+
+    function initialize() {
+        var myOptions = {
+            zoom: 18,
+            mapTypeId: google.maps.MapTypeId.ROADMAP
+        };
+
+        map = new google.maps.Map(document.getElementById("map-canvas"), myOptions);
+        map.setCenter(haymarket);
+
+        // Try W3C Geolocation (Preferred)
+        if (navigator.geolocation) {
+            browserSupportFlag = true;
+            navigator.geolocation.getCurrentPosition(function (position) {
+                initialLocation = new google.maps.LatLng(position.coords.latitude, position.coords.longitude);
+                var objLat = $("#txtLatitude");
+                if (objLat)
+                    $("#txtLatitude").val(position.coords.latitude);
+                var objLong = $("#txtLongitude");
+                if (objLong)
+                    $("#txtLongitude").val(position.coords.longitude);
+
+                //set current location
+                var marker = new google.maps.Marker({
+                    position: initialLocation,
+                    map: map,
+                    title: 'You are here!'
+                });
+
+                var request = {
+                    location: initialLocation,
+                    radius: '500',
+                    query: 'bar'
+                };
+
+                var service = new google.maps.places.PlacesService(map);
+                service.textSearch(request, function (results, status) {
+                    if (status == google.maps.places.PlacesServiceStatus.OK) {
+                        for (var i = 0; i < results.length; i++) {
+                            var place = results[i];
+                            createMarker(place);
+                        }
+                    }
+                });
+
+                map.setCenter(initialLocation);
+            }, function () {
+                handleNoGeolocation(browserSupportFlag);
+            }, { timeout: 600000 });
+        }
+        else {
+            browserSupportFlag = false;
+            handleNoGeolocation(browserSupportFlag);
+        }
+    }
+
+
+    //builds popup content based on properties populated in place object
+    function createContent(place) {
+        var strDynamicRows = [];
+        var contentString = "";
+        strDynamicRows.push('<div id="content"><div id="siteNotice"></div><h1 id="firstHeading" class="firstHeading">' + place.name + '</h1><div id="bodyContent">');
+        strDynamicRows.push('<p><b>Address: </b>' + place.formatted_address + '</p></ br>');
+        if (place.rating)
+            strDynamicRows.push('<p><b>Rating: </b>' + place.rating + '</p></ br>');
+
+        if (place.price_level) {
+            var strPriceLevel = "";
+            switch (place.price_level) {
+                case 0:
+                    strPriceLevel = 'Free'
+                    break;
+                case 1:
+                    strPriceLevel = 'Inexpensive'
+                    break;
+                case 2:
+                    strPriceLevel = 'Moderate'
+                    break;
+                case 3:
+                    strPriceLevel = 'Expensive'
+                    break;
+                case 4:
+                    strPriceLevel = 'Very Expensive'
+                    break;
+            }
+            strDynamicRows.push('<p><b>Price: </b>' + strPriceLevel + '</p></ br>');
+        }
+        strDynamicRows.push('</div></div>');
+
+        for (var x = 0; x < strDynamicRows.length; x++) {
+            contentString = contentString + strDynamicRows[x];
+        }
+        return contentString;
+    }
+
+    //creates google maps marker with image if available, otherwise png icon
+    function createMarker(place) {
+        var photos = place.photos;
+
+        var contentString = createContent(place);
+        var infowindow = new google.maps.InfoWindow({
+            content: contentString
+        });
+
+        var marker = null;
+        if (!photos) {
+            var image = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAlCAYAAAAjt+tHAAAC2klEQVRYhcWXQWgTQRSGvywxhhCKhVKCaKGlUCi0okVBBekhix56EZEeLIqHXgQtWDzoQYSiguLBgxDMUVGiCIKKlVEIBQkIRay1UhArBUErYimhrmGz6yEzddsmm926Sx48ZtjZ3f+bN2+GeRHbtgHQdT0KaEBMtlGCNROwgBJgCSFMgIht20o8BsSlxySAFpC4JQFKgCG9JIQwI+l0WokngCbZxgknAgawDCzJtqRmGZfirUKIQsDCq0zX9b2yawGmM/QJIUQhOzrO/MwC3z7/ClQ41dFMW3crQoiCrus9yGVwJl4cCEUcWPtPlWeaynbloYhXgVjRVFm+4Wzv7W8n8+E0Fx4M+v1UUySerGV7E5eeDKFpESzLpvD4I9u6WujctZX8/SkODPZw7u4Rrg898kXhGeDqy5PMz/zg2rGHNKeSnM8NUjYthrtuAvA+/4VTtwZ8ifsC+F38w9jhe0BlLUd2Z9a98/PrUngAV47mXMen8nNM5efCAxh7frzuO2o5srMjTL74RObMs7rfBHXWr7KyadF3sJPe/vZgAdQM3foAZ/fd9vzPUCKgaZHGApRNq7EA8USssQCXxYnGAmzaHGXxe9HTuRD0rQdYvyvcLJQI+DFfANnZkbr90ADuXHz1X+O1zHMOTOSmmchNb0jEzVQEvJ8cwZmlAEyHk+poDk3R8e8VTY1/5ZIB0NbdGgqEupZLM6SmFUmn0zEgCWzBpTDJjo7z5umsJ7E9A10M3zhUdUwWJgvAIlCMUomAQaVcQhYNztJMAxBCvAbqQihxXdf3y0cqv9aWZgZgeSlOV+7wQohJt0g4xPtYnVu1i9M65blqneXb22oQDvGdcpZqnZ0A1ctzN5NgcSp5kpQQ75wQDvEdUrwo3VBCtawuQA2IpIoE4Jx5ER/ingGqQDRJiEk51idFl/yI+wJYA5GQrq4+JSqhX/Yj7hvAAaGSUm1VtcVKfsQB/gK0cVAzRZfbIAAAAABJRU5ErkJggg==";
+            marker = new google.maps.Marker({
+                map: map,
+                position: place.geometry.location,
+                title: place.name + "\n " + place.formatted_address,
+                icon: image
+            });
+        } else {
+            var photoURL = photos[0].getUrl({ 'maxWidth': 35, 'maxHeight': 35 });
+            marker = new google.maps.Marker({
+                map: map,
+                position: place.geometry.location,
+                title: place.name + "\n " + place.formatted_address,
+                icon: photos[0].getUrl({ 'maxWidth': 35, 'maxHeight': 35 })
+            });
+        }
+
+        google.maps.event.addListener(marker, 'click', function () {
+            closeAllInfoWindows();
+            infowindow.open(map, marker);
+        });
+
+        //add infowindow to array
+        infoWindows.push(infowindow);
+    }
+
+
+    function closeAllInfoWindows() {
+        for (var i = 0; i < infoWindows.length; i++) {
+            infoWindows[i].close();
+        }
+    }
+
+
+    function handleNoGeolocation(errorFlag) {
+        if (errorFlag == true) {
+            alert("Geolocation service failed.");
+            initialLocation = haymarket;
+        } else {
+            alert("Your browser doesn't support geolocation. We've placed you in the Haymarket.");
+            initialLocation = haymarket;
+        }
+        google.maps.event.addDomListener(window, 'load', initialize);
+    }
+
+    $(document).ready(function () {
+        initialize();
+    });
+
+    function isNullOrWhitespace(input) {
+        if (input == null) return true;
+        return input.replace(/\s/g, '').length < 1;
+    }
+</script>
+</html>
